@@ -107,6 +107,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      diagram-js-grid:
+        specifier: ^2.0.0
+        version: 2.0.0
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.3)
@@ -1806,8 +1809,12 @@ packages:
     peerDependencies:
       diagram-js: '*'
 
-  diagram-js@15.6.0:
-    resolution: {integrity: sha512-wDCJQE3deGwdT3PAV4f3SFxMGaEw6/6SknTwEu3nJYVi9pJMoGDfi6WQA2PIGZQGrBvLkHAevMf7Ae+bA1UF/A==}
+  diagram-js-grid@2.0.0:
+    resolution: {integrity: sha512-0yXl4m5cc3vpLnqWlGijzA+/S2aaOQ2KPunojtbdvtDQU54o9TAyosb2TlEVp5wHuaUcmFaAQ1Z4o10dJzRUYg==}
+    engines: {node: '>= 20'}
+
+  diagram-js@15.7.0:
+    resolution: {integrity: sha512-ZZmL5llfcvQyf0m3I4fnhvyPpana5FGDzjYJhuC/AqWiBlnYymnIozxHM87Gt3598SlPEJH5ffOlD8F4LFwa9A==}
 
   didi@11.0.0:
     resolution: {integrity: sha512-PzCfRzQttvFpVcYMbSF7h8EsWjeJpVjWH4qDhB5LkMi1ILvHq4Ob0vhM2wLFziPkbUBi+PAo7ODbe2sacR7nJQ==}
@@ -4527,8 +4534,8 @@ snapshots:
   bpmn-js@18.10.1:
     dependencies:
       bpmn-moddle: 9.0.4
-      diagram-js: 15.6.0
-      diagram-js-direct-editing: 3.3.0(diagram-js@15.6.0)
+      diagram-js: 15.7.0
+      diagram-js-direct-editing: 3.3.0(diagram-js@15.7.0)
       ids: 1.0.5
       inherits-browser: 0.1.0
       min-dash: 4.2.3
@@ -4718,13 +4725,18 @@ snapshots:
 
   detect-node-es@1.1.0: {}
 
-  diagram-js-direct-editing@3.3.0(diagram-js@15.6.0):
+  diagram-js-direct-editing@3.3.0(diagram-js@15.7.0):
     dependencies:
-      diagram-js: 15.6.0
+      diagram-js: 15.7.0
       min-dash: 5.0.0
       min-dom: 5.2.0
 
-  diagram-js@15.6.0:
+  diagram-js-grid@2.0.0:
+    dependencies:
+      min-dash: 5.0.0
+      tiny-svg: 4.1.4
+
+  diagram-js@15.7.0:
     dependencies:
       '@bpmn-io/diagram-js-ui': 0.2.3
       clsx: 2.1.1
