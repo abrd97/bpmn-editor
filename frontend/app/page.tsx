@@ -21,7 +21,7 @@ export default function Home() {
     }
 
     const xml = await file.text();
-    sessionStorage.setItem("bpmn", xml);
+    localStorage.setItem("bpmn", xml);
     router.push("/editor");
 
     e.target.value = "";
