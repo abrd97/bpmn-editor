@@ -42,7 +42,6 @@ export function CollaborationProvider({ children }: { children: React.ReactNode 
   
   const { isConnected, sendMessage: wsSendMessage } = useCollaborationWebSocket();
 
-  // Set up message handlers
   useEffect(() => {
     const handleJoin = (message: CollaborationMessage) => {
       const user = (message.payload as { user?: User }).user;
