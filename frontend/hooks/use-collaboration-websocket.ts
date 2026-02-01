@@ -1,11 +1,15 @@
 import { useEffect } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
-import { websocketService, CollaborationMessage } from "@/app/services/websocket-service";
+import { websocketService, CollaborationMessage } from "@/services";
 
-const WS_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "ws://localhost:8000/ws";
+const WS_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "ws://localhost:8000";
 
-export function useCollaborationWebSocket() {
-  const { sendMessage: sendWsMessage, lastMessage, readyState } = useWebSocket(WS_URL, {
+export function useCollaborationWebSocket(sessionId: string | null) {
+  const wsUrl = sessionId 
+    ? `${WS_BASE_URL}/ws?session=${encodeURIComponent(sessionId)}`
+    : `${WS_BASE_URL}/ws`;
+
+  const { sendMessage: sendWsMessage, lastMessage, readyState } = useWebSocket(wsUrl, {
     shouldReconnect: () => true,
     reconnectAttempts: 10,
     reconnectInterval: 3000,
@@ -47,7 +51,6 @@ export function useCollaborationWebSocket() {
   return {
     isConnected,
     connectionStatus,
-    readyState,
     sendMessage,
   };
 }

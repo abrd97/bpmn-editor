@@ -1,11 +1,31 @@
 "use client";
 
-import { useCollaboration } from "@/app/contexts/collaboration-context";
+import { useState } from "react";
+import { useCollaboration } from "@/contexts/collaboration-context";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Copy, Check } from "lucide-react";
 
 export function OnlineUsers() {
-  const { onlineUsers, isConnected } = useCollaboration();
+  const { onlineUsers, isConnected, sessionId } = useCollaboration();
+  const [copied, setCopied] = useState(false);
+
+  const copySessionLink = async () => {
+    if (!sessionId) return;
+    
+    const url = new URL(window.location.href);
+    url.searchParams.set("session", sessionId);
+    const sessionUrl = url.toString();
+
+    try {
+      await navigator.clipboard.writeText(sessionUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy session link:", err);
+    }
+  };
 
   return (
     <Card className="p-3 bg-white/90 backdrop-blur-sm border shadow-sm">
@@ -36,6 +56,26 @@ export function OnlineUsers() {
             </Badge>
           ))}
         </div>
+        {sessionId && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={copySessionLink}
+            className="ml-2 h-6 px-2 text-xs"
+          >
+            {copied ? (
+              <>
+                <Check className="size-3" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="size-3" />
+                Copy Link
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </Card>
   );

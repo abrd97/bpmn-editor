@@ -1,20 +1,38 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Editor from "@/components/editor";
+import { OnlineUsers } from "@/components/online-users";
 
-export default function EditorPage() {
+function EditorPageContent() {
   const [model, setModel] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     const savedXml = localStorage.getItem("bpmn");
-    setModel(savedXml);
-    setIsMounted(true);
+    queueMicrotask(() => {
+      setModel(savedXml);
+      setIsMounted(true);
+    });
   }, []);
 
   if (!isMounted) {
     return <div className="h-screen w-full bg-slate-50" />; 
   }
 
-  return <Editor model={model} />;
+  return (
+    <div className="relative h-screen">
+      <div className="absolute top-4 right-4 z-10">
+        <OnlineUsers />
+      </div>
+      <Editor model={model} />
+    </div>
+  );
+}
+
+export default function EditorPage() {
+  return (
+    <Suspense fallback={<div className="h-screen w-full bg-slate-50" />}>
+      <EditorPageContent />
+    </Suspense>
+  );
 }

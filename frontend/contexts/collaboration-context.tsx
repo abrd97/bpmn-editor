@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { websocketService, CollaborationMessage, MessageType } from "../services/websocket-service";
+import { useSearchParams } from "next/navigation";
+import { websocketService, CollaborationMessage, MessageType } from "@/services";
 import { useCollaborationWebSocket } from "@/hooks/use-collaboration-websocket";
 
 export interface User {
@@ -23,6 +24,7 @@ interface CollaborationContextType {
   lockedElements: Map<string, LockedElement>;
   sendMessage: (type: MessageType, payload: unknown) => void;
   isConnected: boolean;
+  sessionId: string | null;
 }
 
 const CollaborationContext = createContext<CollaborationContextType | undefined>(undefined);
@@ -36,11 +38,14 @@ export function useCollaboration() {
 }
 
 export function CollaborationProvider({ children }: { children: React.ReactNode }) {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get("session");
+  
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
   const [lockedElements, setLockedElements] = useState<Map<string, LockedElement>>(new Map());
   
-  const { isConnected, sendMessage: wsSendMessage } = useCollaborationWebSocket();
+  const { isConnected, sendMessage: wsSendMessage } = useCollaborationWebSocket(sessionId);
 
   useEffect(() => {
     const handleJoin = (message: CollaborationMessage) => {
@@ -130,11 +135,12 @@ export function CollaborationProvider({ children }: { children: React.ReactNode 
       wsSendMessage({
         type,
         userId: currentUser.id,
+        sessionId: sessionId || undefined,
         timestamp: Date.now(),
         payload,
       });
     },
-    [currentUser, wsSendMessage]
+    [currentUser, wsSendMessage, sessionId]
   );
 
   return (
@@ -145,6 +151,7 @@ export function CollaborationProvider({ children }: { children: React.ReactNode 
         lockedElements,
         sendMessage,
         isConnected,
+        sessionId: sessionId || null,
       }}
     >
       {children}

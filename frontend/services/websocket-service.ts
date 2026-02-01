@@ -4,6 +4,7 @@ export type MessageType = 'command' | 'cursor' | 'join' | 'leave' | 'sync' | 'lo
 export interface CollaborationMessage {
   type: MessageType;
   userId: string;
+  sessionId?: string;
   timestamp: number;
   payload: unknown;
 }
