@@ -1,6 +1,3 @@
-from backend.app.models.session import Session
-
-
 from typing import Optional
 from uuid import UUID
 from app.models.session import Session
