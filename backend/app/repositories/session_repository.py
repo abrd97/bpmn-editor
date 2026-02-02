@@ -1,3 +1,6 @@
+from backend.app.models.session import Session
+
+
 from typing import Optional
 from uuid import UUID
 from app.models.session import Session
@@ -44,7 +47,7 @@ class SessionRepository:
     
     def list_all(self) -> list[Session]:
         """List all sessions"""
-        return list(self._sessions.values())
+        return list[Session](self._sessions.values())
     
     def add_user(self, session_id: UUID, user_id: str) -> Optional[Session]:
         """Add user to session"""
