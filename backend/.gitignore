@@ -1,4 +1,15 @@
+# Python cache files
+__pycache__/
 **/__pycache__/
-.venv/
-.env
 *.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+.env.local
