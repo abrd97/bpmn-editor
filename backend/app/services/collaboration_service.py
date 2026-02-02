@@ -32,8 +32,13 @@ class CollaborationService:
         self._connections: Dict[UUID, Set[WebSocket]] = {}
         self._websocket_info: Dict[WebSocket, tuple[UUID, str]] = {}
     
-    def generate_user(self) -> User:
-        """Generate a new user with random name and color"""
+    def get_or_create_user(self, user_id: Optional[str] = None) -> User:
+        """Get existing user by ID or create a new one"""
+        if user_id:
+            existing_user = self._user_repository.get(user_id)
+            if existing_user:
+                return existing_user
+        
         nouns = ["Fox", "Eagle", "Lion", "Wolf", "Hawk", "Bear", "Tiger", "Panther"]
         name = f"{random.choice(nouns)}"
         color = random.choice(self.USER_COLORS)
@@ -84,9 +89,6 @@ class CollaborationService:
                 del self._connections[session_id]
         
         del self._websocket_info[websocket]
-        
-        self._session_service.remove_user(session_id, user_id)
-        
         leave_message = CollaborationMessage(
             type="leave",
             userId=user_id,
