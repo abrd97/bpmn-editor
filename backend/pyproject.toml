@@ -1,9 +1,11 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Real-time collaborative BPMN editor backend"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi[standard]>=0.128.0",
+    "pydantic>=2.0.0",
+    "uvicorn[standard]>=0.30.0",
 ]
