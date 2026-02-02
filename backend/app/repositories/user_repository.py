@@ -1,3 +1,6 @@
+from backend.app.models.user import User
+
+
 from typing import Optional
 from app.models.user import User
 
@@ -33,7 +36,7 @@ class UserRepository:
     
     def list_all(self) -> list[User]:
         """List all users"""
-        return list(self._users.values())
+        return list[User](self._users.values())
 
 
 user_repository = UserRepository()
