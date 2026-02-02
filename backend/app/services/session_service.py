@@ -31,14 +31,6 @@ class SessionService:
     def update_bpmn_xml(self, session_id: UUID, xml: str) -> Optional[Session]:
         """Update BPMN XML for a session"""
         return self._repository.update_bpmn_xml(session_id, xml)
-    
-    def add_user(self, session_id: UUID, user_id: str) -> Optional[Session]:
-        """Add user to session"""
-        return self._repository.add_user(session_id, user_id)
-    
-    def remove_user(self, session_id: UUID, user_id: str) -> Optional[Session]:
-        """Remove user from session"""
-        return self._repository.remove_user(session_id, user_id)
 
 
 session_service = SessionService()

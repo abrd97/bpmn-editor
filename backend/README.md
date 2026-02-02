@@ -1,28 +1,21 @@
-# BPMN Editor Backend
-
-FastAPI backend for real-time collaborative BPMN editor.
+# Backend
 
 ## Requirements
 
-- Python >= 3.13
-- [uv](https://github.com/astral-sh/uv) package manager
+- **Python**: 3.13 or higher
+- **uv**: Latest version (Python package manager)
+
+## Setup
+
+```bash
+uv sync
+```
 
 ## Development
 
 ```bash
-# Install dependencies
-uv sync
-
-# Run development server
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Production
-
-```bash
-# Install dependencies
-uv sync
-
-# Run production server
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+The API will be available at http://localhost:8000
+API documentation at http://localhost:8000/docs

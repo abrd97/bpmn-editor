@@ -32,13 +32,8 @@ class CollaborationService:
         self._connections: Dict[UUID, Set[WebSocket]] = {}
         self._websocket_info: Dict[WebSocket, tuple[UUID, str]] = {}
     
-    def get_or_create_user(self, user_id: Optional[str] = None) -> User:
-        """Get existing user by ID or create a new one"""
-        if user_id:
-            existing_user = self._user_repository.get(user_id)
-            if existing_user:
-                return existing_user
-        
+    def generate_user(self) -> User:
+        """Generate a new user with random name and color"""
         nouns = ["Fox", "Eagle", "Lion", "Wolf", "Hawk", "Bear", "Tiger", "Panther"]
         name = f"{random.choice(nouns)}"
         color = random.choice(self.USER_COLORS)
@@ -56,7 +51,34 @@ class CollaborationService:
         self._connections[session_id].add(websocket)
         self._websocket_info[websocket] = (session_id, user.id)
         
-        self._session_service.add_user(session_id, user.id)
+        existing_users = []
+        seen_user_ids = set[User]()
+        
+        for ws in self._connections[session_id]:
+            if ws == websocket or ws not in self._websocket_info:
+                continue
+            
+            _, existing_user_id = self._websocket_info[ws]
+            if existing_user_id in seen_user_ids:
+                continue
+            
+            existing_user = self._user_repository.get(existing_user_id)
+            if not existing_user:
+                continue
+            
+            seen_user_ids.add(existing_user_id)
+            existing_users.append(existing_user.model_dump())
+        
+        join_message_to_user = CollaborationMessage(
+            type="join",
+            userId=user.id,
+            sessionId=str(session_id),
+            payload={
+                "user": user.model_dump(),
+                "existingUsers": existing_users
+            }
+        )
+        await self._send_to_websocket(websocket, join_message_to_user)
         
         join_message = CollaborationMessage(
             type="join",
@@ -66,6 +88,7 @@ class CollaborationService:
         )
         await self._broadcast_to_session(session_id, join_message, exclude_user_id=user.id)
         
+        # Send current diagram state if available
         session = self._session_service.get_session(session_id)
         if session and session.bpmn_xml:
             sync_message = CollaborationMessage(
@@ -83,12 +106,14 @@ class CollaborationService:
         
         session_id, user_id = self._websocket_info[websocket]
         
+        # Remove WebSocket connection
         if session_id in self._connections:
             self._connections[session_id].discard(websocket)
             if not self._connections[session_id]:
                 del self._connections[session_id]
         
         del self._websocket_info[websocket]
+        
         leave_message = CollaborationMessage(
             type="leave",
             userId=user_id,
@@ -103,6 +128,9 @@ class CollaborationService:
             return
         
         session_id, user_id = self._websocket_info[websocket]
+        
+        if message.userId != user_id:
+            return
         
         message.sessionId = str(session_id)
         message.userId = user_id

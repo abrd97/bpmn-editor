@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import Query, Cookie
+from fastapi import Query
 from app.services import session_service, collaboration_service
 from app.services.session_service import SessionService
 from app.services.collaboration_service import CollaborationService
@@ -13,8 +13,6 @@ def get_session_service() -> SessionService:
 def get_collaboration_service() -> CollaborationService:
     """Dependency to get collaboration service"""
     return collaboration_service
-
-
 def get_session_id(
     session: Optional[str] = Query(default=None, description="Session ID from query parameter")
 ) -> Optional[str]:
@@ -22,8 +20,3 @@ def get_session_id(
     return session
 
 
-def get_user_id(
-    user_id: Optional[str] = Cookie(default=None, alias="user_id")
-) -> Optional[str]:
-    """Get user ID from cookie"""
-    return user_id

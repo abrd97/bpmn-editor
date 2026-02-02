@@ -30,8 +30,6 @@ class SessionRepository:
         """Update existing session"""
         if session.id not in self._sessions:
             raise ValueError(f"Session {session.id} not found")
-        from datetime import datetime
-        session.updated_at = datetime.now()
         self._sessions[session.id] = session
         return session
     
@@ -45,22 +43,6 @@ class SessionRepository:
     def list_all(self) -> list[Session]:
         """List all sessions"""
         return list[Session](self._sessions.values())
-    
-    def add_user(self, session_id: UUID, user_id: str) -> Optional[Session]:
-        """Add user to session"""
-        session = self.get(session_id)
-        if session:
-            session.user_ids.add(user_id)
-            return self.update(session)
-        return None
-    
-    def remove_user(self, session_id: UUID, user_id: str) -> Optional[Session]:
-        """Remove user from session"""
-        session = self.get(session_id)
-        if session:
-            session.user_ids.discard(user_id)
-            return self.update(session)
-        return None
     
     def update_bpmn_xml(self, session_id: UUID, xml: str) -> Optional[Session]:
         """Update BPMN XML for a session"""

@@ -4,8 +4,7 @@ from typing import Optional
 from app.dependencies import (
     get_session_service,
     get_collaboration_service,
-    get_session_id,
-    get_user_id
+    get_session_id
 )
 from app.services.session_service import SessionService
 from app.services.collaboration_service import CollaborationService
@@ -34,7 +33,6 @@ app.add_middleware(
 async def websocket_endpoint(
     websocket: WebSocket,
     session_id: Optional[str] = Depends(get_session_id),
-    user_id: Optional[str] = Depends(get_user_id),
     session_service: SessionService = Depends(get_session_service),
     collaboration_service: CollaborationService = Depends(get_collaboration_service),
 ):
@@ -42,8 +40,8 @@ async def websocket_endpoint(
     WebSocket endpoint for real-time collaboration.
     
     Handles:
-    - Session creation/joining (via query param)
-    - User assignment (from cookie if exists, otherwise new)
+    - Session creation/joining
+    - User assignment
     - Message routing
     - State synchronization
     """
@@ -51,41 +49,38 @@ async def websocket_endpoint(
         session = session_service.get_or_create_session(session_id)
         session_uuid = session.id
         
-        user = collaboration_service.get_or_create_user(user_id)
+        user = collaboration_service.generate_user()
         
         await collaboration_service.connect(websocket, session_uuid, user)
         
-        logger.info(f"User {user.id} connected to session {session_uuid}")
+        try:
+            while True:
+                try:
+                    data = await websocket.receive_text()
+                    message_dict = json.loads(data)
+                    
+                    message = CollaborationMessage(**message_dict)
+                    
+                    await collaboration_service.handle_message(websocket, message)
+                    
+                except (WebSocketDisconnect, RuntimeError):
+                    break
+                
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON received: {e}")
+                    continue
+                
+                except Exception as e:
+                    logger.warning(f"Invalid message format: {e}")
+                    continue
         
-        while True:
-            try:
-                data = await websocket.receive_text()
-                message_dict = json.loads(data)
-                
-                message = CollaborationMessage(**message_dict)
-                
-                await collaboration_service.handle_message(websocket, message)
-                
-            except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON received: {e}")
-                # Send error response (note: "error" is not a standard MessageType, but useful for debugging)
-                error_response = {
-                    "type": "error",
-                    "userId": "system",
-                    "sessionId": str(session_uuid),
-                    "payload": {"error": "Invalid message format"}
-                }
-                await websocket.send_text(json.dumps(error_response))
-            
-            except Exception as e:
-                logger.error(f"Error handling message: {e}")
-    
-    except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
-        await collaboration_service.disconnect(websocket)
+        except WebSocketDisconnect:
+            pass
+        finally:
+            await collaboration_service.disconnect(websocket)
     
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        logger.error(f"WebSocket connection error: {e}")
         try:
             await collaboration_service.disconnect(websocket)
         except Exception:

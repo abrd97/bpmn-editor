@@ -1,6 +1,3 @@
-from backend.app.models.user import User
-
-
 from typing import Optional
 from app.models.user import User
 
