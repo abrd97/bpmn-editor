@@ -1,18 +1,19 @@
 import { throttle } from "lodash";
+import Canvas from "diagram-js/lib/core/Canvas";
 import { MessageType } from "./websocket-service";
 import { ICollaborationService } from "./collaboration-service-base";
-
-interface CursorPayload {
-  x: number;
-  y: number;
-}
 
 export class OutboundCursorService implements ICollaborationService {
   private sendMessage: ((type: MessageType, payload: unknown) => void) | null = null;
   private mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
+  private canvas: Canvas | null = null;
 
   public setSendMessage(fn: (type: MessageType, payload: unknown) => void) {
     this.sendMessage = fn;
+  }
+
+  public setCanvas(canvas: Canvas | null) {
+    this.canvas = canvas;
   }
 
   public startTracking() {
@@ -21,7 +22,35 @@ export class OutboundCursorService implements ICollaborationService {
     }
 
     this.mouseMoveHandler = throttle((e: MouseEvent) => {
-      const payload: CursorPayload = { x: e.clientX, y: e.clientY };
+      // Convert screen coordinates to canvas coordinates
+      let x = e.clientX;
+      let y = e.clientY;
+
+      if (this.canvas) {
+        try {
+          const container = this.canvas.getContainer();
+          if (container && typeof container.getBoundingClientRect === 'function') {
+            const rect = container.getBoundingClientRect();
+            if (rect) {
+              // Get relative position within canvas container
+              const relativeX = e.clientX - rect.left;
+              const relativeY = e.clientY - rect.top;
+            
+            // Convert to canvas coordinates using viewbox
+            const viewbox = this.canvas.viewbox();
+            const scale = viewbox.scale || 1;
+            
+                // Canvas coordinates = (screen position / scale) + viewbox offset
+                x = (relativeX / scale) + viewbox.x;
+                y = (relativeY / scale) + viewbox.y;
+            }
+          }
+          } catch {
+            // Canvas not ready, fall back to screen coordinates
+          }
+      }
+
+      const payload = { x, y };
       this._broadcast("cursor", payload);
     }, 50);
 
@@ -40,9 +69,8 @@ export class OutboundCursorService implements ICollaborationService {
     this.sendMessage = null;
   }
 
-  private _broadcast(type: MessageType, data: CursorPayload) {
+  private _broadcast(type: MessageType, data: Record<string, unknown>) {
     if (!this.sendMessage) {
-      // Silently drop messages if sendMessage not set yet (during initialization)
       return;
     }
 

@@ -37,8 +37,11 @@ export function LockedElementsOverlay({
         let container: HTMLElement | null = null;
         try {
           container = canvas.getContainer();
+          // Additional check: ensure container is actually a DOM element
+          if (!container || typeof container.getBoundingClientRect !== 'function') {
+            return;
+          }
         } catch {
-          // Canvas not fully initialized yet
           return;
         }
         
@@ -111,10 +114,14 @@ export function LockedElementsOverlay({
 
     return () => {
       eventBus.off("canvas.viewbox.changed", updateOverlays);
-      const container = canvas?.getContainer();
-      if (container) {
-        const overlays = container.querySelectorAll(".collaboration-lock-overlay");
-        overlays.forEach((el) => el.remove());
+      try {
+        const container = canvas?.getContainer();
+        if (container && typeof container.querySelectorAll === 'function') {
+          const overlays = container.querySelectorAll(".collaboration-lock-overlay");
+          overlays.forEach((el) => el.remove());
+        }
+      } catch {
+        // Ignore cleanup errors
       }
     };
   }, [eventBus, canvas, elementRegistry, lockedElementIds, lockedElements]);

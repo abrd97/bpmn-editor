@@ -8,15 +8,13 @@ import { Card } from "@/components/ui/card";
 import { Copy, Check } from "lucide-react";
 
 export function OnlineUsers() {
-  const { onlineUsers, isConnected, sessionId } = useCollaboration();
+  const { remoteUsers, isConnected, sessionId } = useCollaboration();
   const [copied, setCopied] = useState(false);
 
+  const totalUsers = isConnected ? remoteUsers.size + 1 : 0;
+
   const copySessionLink = async () => {
-    if (!sessionId) return;
-    
-    const url = new URL(window.location.href);
-    url.searchParams.set("session", sessionId);
-    const sessionUrl = url.toString();
+    const sessionUrl = window.location.href;
 
     try {
       await navigator.clipboard.writeText(sessionUrl);
@@ -37,11 +35,11 @@ export function OnlineUsers() {
             }`}
           />
           <span className="text-sm font-medium text-gray-700">
-            {onlineUsers.length} {onlineUsers.length === 1 ? "user" : "users"} online
+            {totalUsers} {totalUsers === 1 ? "user" : "users"} online
           </span>
         </div>
         <div className="flex gap-1 ml-2">
-          {onlineUsers.map((user) => (
+          {Array.from(remoteUsers.values()).map((user) => (
             <Badge
               key={user.id}
               variant="secondary"

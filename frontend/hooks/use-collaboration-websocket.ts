@@ -10,18 +10,9 @@ export function useCollaborationWebSocket(sessionId: string | null) {
     : `${WS_BASE_URL}/ws`;
 
   const { sendMessage: sendWsMessage, lastMessage, readyState } = useWebSocket(wsUrl, {
-    shouldReconnect: () => true,
     reconnectAttempts: 10,
     reconnectInterval: 3000,
   });
-
-  const connectionStatus = {
-    [ReadyState.CONNECTING]: "Connecting",
-    [ReadyState.OPEN]: "Open",
-    [ReadyState.CLOSING]: "Closing",
-    [ReadyState.CLOSED]: "Closed",
-    [ReadyState.UNINSTANTIATED]: "Uninstantiated",
-  }[readyState];
 
   const isConnected = readyState === ReadyState.OPEN;
 
@@ -50,7 +41,6 @@ export function useCollaborationWebSocket(sessionId: string | null) {
 
   return {
     isConnected,
-    connectionStatus,
     sendMessage,
   };
 }

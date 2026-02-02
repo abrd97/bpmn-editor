@@ -1,6 +1,8 @@
 # BPMN Editor
 
-Real-time collaborative BPMN editor.
+Real-time collaborative BPMN editor with WebSocket-based synchronization.
+
+![BPMN Editor Screenshot](./docs/screenshot.png)
 
 ## Quick Start
 

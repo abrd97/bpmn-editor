@@ -3,24 +3,18 @@ import CommandStack from "diagram-js/lib/command/CommandStack";
 import { MessageType } from "./websocket-service";
 import { ICollaborationService } from "./collaboration-service-base";
 
-interface CommandPayload {
-  command: string;
-  context: Record<string, unknown>;
-}
-
-interface LockPayload {
-  elementId: string;
-}
-
 export class OutboundBpmnService implements ICollaborationService {
   static $inject = ["eventBus", "commandStack"];
 
   private sendMessage: ((type: MessageType, payload: unknown) => void) | null = null;
+  private setDiagramXml: ((xml: string) => void) | null = null;
+  private exportXml: (() => Promise<string | undefined>) | null = null;
   private currentEditingElement: string | null = null;
   private commandStackExecutedListener: ((e: unknown) => void) | null = null;
   private commandStackRevertedListener: ((e: unknown) => void) | null = null;
   private commandStackChangedListener: (() => void) | null = null;
   private selectionListener: ((e: unknown) => void) | null = null;
+  private diagramExportListener: (() => void) | null = null;
 
   constructor(
     private eventBus: EventBus,
@@ -47,6 +41,11 @@ export class OutboundBpmnService implements ICollaborationService {
       this.eventBus.off("selection.changed", this.selectionListener);
       this.selectionListener = null;
     }
+    if (this.diagramExportListener) {
+      this.eventBus.off("commandStack.changed", this.diagramExportListener);
+      this.eventBus.off("diagram.init", this.diagramExportListener);
+      this.diagramExportListener = null;
+    }
   }
 
   /**
@@ -54,6 +53,19 @@ export class OutboundBpmnService implements ICollaborationService {
    */
   public setSendMessage(fn: (type: MessageType, payload: unknown) => void) {
     this.sendMessage = fn;
+  }
+
+  /**
+   * Set the diagram XML update function and export function from collaboration context
+   * This will be called whenever the diagram changes to keep state in sync
+   */
+  public setDiagramXmlUpdater(
+    setXmlFn: (xml: string) => void,
+    exportXmlFn: () => Promise<string | undefined>
+  ) {
+    this.setDiagramXml = setXmlFn;
+    this.exportXml = exportXmlFn;
+    this._setupDiagramExportTracking();
   }
 
   private _setupCommandTracking() {
@@ -65,12 +77,22 @@ export class OutboundBpmnService implements ICollaborationService {
         const e = event as { command?: string; context?: Record<string, unknown> };
         if (!e.command || !e.context) return;
 
-        // Skip remote commands to prevent feedback loop
         if ((e.context as { isRemote?: boolean })?.isRemote) return;
 
-        const payload: CommandPayload = {
+        if (e.command === 'lane.updateRefs' || e.command === 'updateFlowNodeRefs') {
+          return;
+        }
+
+        const extractedContext = this._extractContextData(e.context);
+        
+        const contextKeys = Object.keys(extractedContext);
+        if (contextKeys.length === 0 || (contextKeys.length === 1 && contextKeys[0] === 'isRemote')) {
+          return;
+        }
+
+        const payload = {
           command: e.command,
-          context: this._extractContextData(e.context),
+          context: extractedContext,
         };
 
         this._broadcast("command", payload);
@@ -85,13 +107,13 @@ export class OutboundBpmnService implements ICollaborationService {
         const e = event as { command?: string; context?: Record<string, unknown> };
         if (!e.command || !e.context) return;
 
-        // Skip remote commands
         if ((e.context as { isRemote?: boolean })?.isRemote) return;
 
-        // For undo, we need to send the inverse command
-        // Note: This is a simplified approach - proper undo would require
-        // tracking the inverse operation, which is complex
-        const payload: CommandPayload = {
+        if (e.command === 'lane.updateRefs' || e.command === 'updateFlowNodeRefs') {
+          return;
+        }
+
+        const payload = {
           command: e.command,
           context: this._extractContextData(e.context),
         };
@@ -102,12 +124,8 @@ export class OutboundBpmnService implements ICollaborationService {
       }
     };
 
-    // Fallback: Listen to generic changed event for other operations (clear, etc.)
-    // This requires accessing internals, but only as a fallback
     this.commandStackChangedListener = () => {
       try {
-        // Only use this if executed/reverted events don't provide enough info
-        // Access command stack internals (fragile but necessary as fallback)
         const commandStackInternal = this.commandStack as unknown as {
           _stack?: Array<{ command: string; context: Record<string, unknown> }>;
           _stackIdx?: number;
@@ -121,9 +139,11 @@ export class OutboundBpmnService implements ICollaborationService {
         const action = undoStack[stackIdx];
         if (!action || (action.context as { isRemote?: boolean })?.isRemote) return;
 
-        // Only broadcast if this wasn't already handled by executed/reverted events
-        // (This is a safety net for edge cases)
-        const payload: CommandPayload = {
+        if (action.command === 'lane.updateRefs' || action.command === 'updateFlowNodeRefs') {
+          return;
+        }
+
+        const payload: Record<string, unknown> = {
           command: action.command,
           context: this._extractContextData(action.context),
         };
@@ -141,49 +161,94 @@ export class OutboundBpmnService implements ICollaborationService {
 
   /**
    * Extract only essential data from context, avoiding full object references
-   * This prevents circular reference issues and reduces payload size
    */
   private _extractContextData(context: Record<string, unknown>): Record<string, unknown> {
     const extracted: Record<string, unknown> = {};
 
-    // Extract IDs from objects (avoid sending full objects)
-    if (context.shape) {
-      const shape = context.shape as { id?: string };
-      if (shape.id) extracted.shapeId = shape.id;
+    if (context.shapes && Array.isArray(context.shapes)) {
+      extracted.shapesIds = this._extractElementIds(context.shapes);
+      extracted._arrayType = 'shapes';
     }
 
-    if (context.elements) {
-      const elements = context.elements as Array<{ id?: string } | string>;
-      extracted.elementIds = elements.map((el) => {
-        if (typeof el === "string") return el;
-        return el.id || "";
-      });
+    if (context.elements && Array.isArray(context.elements)) {
+      extracted.elementIds = this._extractElementIds(context.elements);
+      extracted._arrayType = 'elements';
     }
 
-    if (context.element) {
-      const element = context.element as { id?: string };
-      if (element.id) extracted.elementId = element.id;
+    // Extract singular element references
+    if (context.shape && !Array.isArray(context.shape)) {
+      extracted.shapeId = this._extractId(context.shape);
     }
-
-    if (context.newShape) {
-      const newShape = context.newShape as { id?: string };
-      if (newShape.id) extracted.newShapeId = newShape.id;
+    if (context.element && !Array.isArray(context.element)) {
+      extracted.elementId = this._extractId(context.element);
     }
-
     if (context.connection) {
-      const connection = context.connection as { id?: string };
-      if (connection.id) extracted.connectionId = connection.id;
+      extracted.connectionId = this._extractId(context.connection);
+    }
+    if (context.newShape) {
+      extracted.newShapeId = this._extractId(context.newShape);
     }
 
-    // Copy primitive values and simple objects directly
-    const simpleKeys = ["delta", "newParent", "properties", "newBounds", "newWaypoints", "source", "target"];
-    for (const key of simpleKeys) {
+    if (context.parent) {
+      extracted.parentId = this._extractId(context.parent);
+    }
+    if (context.newParent) {
+      extracted.newParentId = this._extractId(context.newParent);
+    }
+    if (context.oldParent) {
+      extracted.oldParentId = this._extractId(context.oldParent);
+    }
+    if (context.newHost) {
+      extracted.newHostId = this._extractId(context.newHost);
+    }
+    if (context.source) {
+      extracted.sourceId = this._extractId(context.source);
+    }
+    if (context.target) {
+      extracted.targetId = this._extractId(context.target);
+    }
+    if (context.newSource) {
+      extracted.newSourceId = this._extractId(context.newSource);
+    }
+    if (context.newTarget) {
+      extracted.newTargetId = this._extractId(context.newTarget);
+    }
+
+    const primitiveKeys = [
+      'delta',
+      'position',
+      'newBounds',
+      'oldBounds',
+      'properties',
+      'newWaypoints',
+      'hints',
+      'newParentIndex',
+      'oldParentIndex',
+      'parentIndex',
+      'dockingOrPoints'
+    ];
+    for (const key of primitiveKeys) {
       if (key in context) {
         extracted[key] = context[key];
       }
     }
 
     return extracted;
+  }
+
+  private _extractId(obj: unknown): string | null {
+    if (!obj) return null;
+    if (typeof obj === 'string') return obj;
+    if (typeof obj === 'object' && obj !== null && 'id' in obj) {
+      return (obj as { id: string }).id;
+    }
+    return null;
+  }
+
+  private _extractElementIds(elements: unknown[]): string[] {
+    return elements
+      .map(el => this._extractId(el))
+      .filter((id): id is string => id !== null);
   }
 
   private _setupElementSelectionTracking() {
@@ -193,14 +258,10 @@ export class OutboundBpmnService implements ICollaborationService {
       const selectedElement = newSelection.length > 0 ? newSelection[0] : null;
       const selectedElementId = selectedElement?.id || null;
 
-      // Only broadcast if selection actually changed
       if (selectedElementId !== this.currentEditingElement) {
-        // Unlock previous element
         if (this.currentEditingElement) {
           this._broadcast("unlock", { elementId: this.currentEditingElement });
         }
-
-        // Lock new element (or clear if nothing selected)
         this.currentEditingElement = selectedElementId;
         if (selectedElementId) {
           this._broadcast("lock", { elementId: selectedElementId });
@@ -211,12 +272,41 @@ export class OutboundBpmnService implements ICollaborationService {
     this.eventBus.on("selection.changed", this.selectionListener);
   }
 
-  private _broadcast(
-    type: MessageType,
-    data: CommandPayload | LockPayload
-  ) {
+  private _setupDiagramExportTracking() {
+    if (this.diagramExportListener) {
+      return;
+    }
+
+    let exportTimeout: NodeJS.Timeout | null = null;
+
+    this.diagramExportListener = () => {
+      if (exportTimeout) {
+        clearTimeout(exportTimeout);
+      }
+
+      exportTimeout = setTimeout(() => {
+        if (!this.setDiagramXml || !this.exportXml) return;
+
+        const exportFn = this.exportXml;
+        const setXmlFn = this.setDiagramXml;
+        exportFn()
+          .then((xml) => {
+            if (xml && setXmlFn) {
+              setXmlFn(xml);
+            }
+          })
+          .catch((err) => {
+            console.error("[Outbound] Error exporting diagram XML:", err);
+          });
+      }, 500);
+    };
+
+    this.eventBus.on("commandStack.changed", this.diagramExportListener);
+    this.eventBus.on("diagram.init", this.diagramExportListener);
+  }
+
+  private _broadcast(type: MessageType, data: Record<string, unknown>) {
     if (!this.sendMessage) {
-      // Silently drop messages if sendMessage not set yet (during initialization)
       return;
     }
 

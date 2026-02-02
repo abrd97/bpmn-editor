@@ -6,6 +6,9 @@ from app.models.user import User
 from app.services.session_service import session_service
 from app.repositories import user_repository
 import random
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CollaborationService:
@@ -52,7 +55,7 @@ class CollaborationService:
         self._websocket_info[websocket] = (session_id, user.id)
         
         existing_users = []
-        seen_user_ids = set[User]()
+        seen_user_ids = set[str]()
         
         for ws in self._connections[session_id]:
             if ws == websocket or ws not in self._websocket_info:
@@ -125,11 +128,13 @@ class CollaborationService:
     async def handle_message(self, websocket: WebSocket, message: CollaborationMessage) -> None:
         """Handle incoming WebSocket message"""
         if websocket not in self._websocket_info:
+            logger.warning("[Backend] WebSocket not in _websocket_info")
             return
         
         session_id, user_id = self._websocket_info[websocket]
         
         if message.userId != user_id:
+            logger.warning(f"[Backend] User ID mismatch: message.userId={message.userId}, expected={user_id}")
             return
         
         message.sessionId = str(session_id)
@@ -151,6 +156,7 @@ class CollaborationService:
     ) -> None:
         """Broadcast message to all clients in a session"""
         if session_id not in self._connections:
+            logger.warning(f"[Backend] Session {session_id} not in _connections")
             return
         
         disconnected = set[WebSocket]()
